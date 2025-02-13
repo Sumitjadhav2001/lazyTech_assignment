@@ -11,22 +11,25 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class BookAdapter extends ArrayAdapter<String> {
     private final List<String> availableBooks;
     private final List<String> bookedBooks;
-    private final HashMap<String, Integer> bookQuantities;
+    private final Map<String, Integer> bookQuantities;
+    private final Map<String, Integer> soldQuantities;
     private final LayoutInflater inflater;
     private final boolean isBookedBooksList;
 
     public BookAdapter(Context context, List<String> availableBooks, List<String> bookedBooks,
-                       HashMap<String, Integer> bookQuantities, boolean isBookedBooksList) {
+                       Map<String, Integer> bookQuantities, Map<String, Integer> soldQuantities,
+                       boolean isBookedBooksList) {
         super(context, R.layout.book_item, isBookedBooksList ? bookedBooks : availableBooks);
         this.availableBooks = availableBooks;
         this.bookedBooks = bookedBooks;
         this.bookQuantities = bookQuantities;
+        this.soldQuantities = soldQuantities;
         this.isBookedBooksList = isBookedBooksList;
         this.inflater = LayoutInflater.from(context);
     }
@@ -42,17 +45,24 @@ public class BookAdapter extends ArrayAdapter<String> {
         Button sellButton = convertView.findViewById(R.id.sellButton);
 
         String bookName = isBookedBooksList ? bookedBooks.get(position) : availableBooks.get(position);
-        int quantity = bookQuantities.getOrDefault(bookName, 0);
-
         bookTitle.setText(bookName);
-        bookQuantity.setText("Qty: " + quantity);
 
-        sellButton.setOnClickListener(v -> showSellDialog(position, bookName, quantity));
+        if (isBookedBooksList) {
+            // Display the sold quantity instead of remaining quantity
+            bookQuantity.setText("Sold: " + soldQuantities.getOrDefault(bookName, 0));
+            sellButton.setVisibility(View.GONE);
+        } else {
+            // Display available quantity
+            bookQuantity.setText("Available: " + bookQuantities.getOrDefault(bookName, 0));
+            sellButton.setVisibility(View.VISIBLE);
+
+            sellButton.setOnClickListener(v -> showSellDialog(position, bookName));
+        }
 
         return convertView;
     }
 
-    private void showSellDialog(int position, String bookName, int availableQuantity) {
+    private void showSellDialog(int position, String bookName) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle("Sell " + bookName);
 
@@ -61,26 +71,29 @@ public class BookAdapter extends ArrayAdapter<String> {
         builder.setView(dialogView);
 
         builder.setPositiveButton("Sell", (dialog, which) -> {
-            int sellQuantity;
-            try {
-                sellQuantity = Integer.parseInt(quantityInput.getText().toString());
-            } catch (NumberFormatException e) {
-                Toast.makeText(getContext(), "Invalid quantity", Toast.LENGTH_SHORT).show();
-                return;
-            }
+            String input = quantityInput.getText().toString().trim();
+            if (!input.isEmpty()) {
+                int sellQuantity = Integer.parseInt(input);
+                int available = bookQuantities.getOrDefault(bookName, 0);
 
-            if (sellQuantity > availableQuantity || sellQuantity <= 0) {
-                Toast.makeText(getContext(), "Invalid quantity", Toast.LENGTH_SHORT).show();
-            } else {
-                bookQuantities.put(bookName, availableQuantity - sellQuantity);
-                if (!bookedBooks.contains(bookName)) {
+                if (sellQuantity > 0 && sellQuantity <= available) {
+                    bookQuantities.put(bookName, available - sellQuantity);
+                    soldQuantities.put(bookName, soldQuantities.getOrDefault(bookName, 0) + sellQuantity);
+
+                    if (bookQuantities.get(bookName) == 0) {
+                        availableBooks.remove(bookName);
+                    }
+
                     bookedBooks.add(bookName);
+                    notifyDataSetChanged();
+                } else {
+                    Toast.makeText(getContext(), "Invalid quantity!", Toast.LENGTH_SHORT).show();
                 }
-                notifyDataSetChanged();
             }
         });
 
         builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
-        builder.show();
+
+        builder.create().show();
     }
 }

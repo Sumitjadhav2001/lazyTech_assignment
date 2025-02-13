@@ -32,7 +32,7 @@
         android:id="@+id/viewBookedBooksButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="View Booked Books"
+        android:text="view sold"
         android:padding="12dp"
         android:backgroundTint="@android:color/holo_blue_dark"
         android:textColor="@android:color/white"
